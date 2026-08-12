@@ -13,11 +13,23 @@ from apscheduler.triggers.cron import CronTrigger
 from database import Base, engine, get_db, SessionLocal
 import models
 import schemas
+import hashlib
+import time
 from services.ocr import extract_badge_data
 from services.transcribe import transcribe_audio
 from services.email_service import send_folder_email, send_report_email
 from services.whatsapp_service import notify_lead
 from services.report import build_leads_xlsx
+
+# guarda impressões digitais de envios recentes pra evitar duplicidade
+# (proteção extra contra duplo clique/toque, além da trava do frontend)
+_RECENT_SUBMISSIONS = {}
+_DEDUPE_WINDOW_SECONDS = 15
+
+
+def _submission_fingerprint(lead: "schemas.LeadCreate") -> str:
+    raw = f"{lead.employee_id}|{lead.first_name}|{lead.last_name}|{lead.phone}|{','.join(sorted(lead.emails))}|{lead.classification}"
+    return hashlib.sha256(raw.encode()).hexdigest()
 
 Base.metadata.create_all(bind=engine)
 
@@ -156,6 +168,18 @@ def _dispatch_notifications(lead_id: int, db_url_dep):
 
 @app.post("/api/leads")
 def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    # proteção contra duplo clique/toque: ignora reenvio idêntico dentro de 15s
+    fingerprint = _submission_fingerprint(lead)
+    now = time.time()
+    last_seen = _RECENT_SUBMISSIONS.get(fingerprint)
+    if last_seen and (now - last_seen) < _DEDUPE_WINDOW_SECONDS:
+        raise HTTPException(409, "Envio duplicado detectado, ignorado.")
+    _RECENT_SUBMISSIONS[fingerprint] = now
+    # limpeza simples de entradas antigas
+    for fp, ts in list(_RECENT_SUBMISSIONS.items()):
+        if (now - ts) > _DEDUPE_WINDOW_SECONDS:
+            del _RECENT_SUBMISSIONS[fp]
+
     employee = db.query(models.Employee).get(lead.employee_id)
     if not employee:
         raise HTTPException(404, "Funcionário não encontrado")
