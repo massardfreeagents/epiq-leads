@@ -1,10 +1,8 @@
 import os
 import uuid
 import shutil
-import csv
-import io
 
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
@@ -30,7 +28,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 REPORT_RECIPIENTS = ["bruno.massard@epiqglobal.com", "yuri.medeiros@epiqglobal.com"]
 REPORT_SENDER = "bruno.massard@epiqglobal.com"  # precisa estar verificado como Single Sender no Brevo
-EXPORT_TOKEN = os.environ.get("EXPORT_TOKEN", "")  # senha simples pro link manual de exportação
+EXPORT_TOKEN = os.environ.get("EXPORT_TOKEN", "").strip()  # senha simples pro link manual de exportação
 
 
 def send_daily_report():
@@ -212,42 +210,23 @@ def list_leads(db: Session = Depends(get_db)):
 
 
 @app.get("/api/leads/export")
-def export_leads_csv(token: str = Query(...), db: Session = Depends(get_db)):
-    if not EXPORT_TOKEN or token != EXPORT_TOKEN:
+def export_leads_xlsx(x_export_token: str = Header(None), db: Session = Depends(get_db)):
+    if not EXPORT_TOKEN or (x_export_token or "").strip() != EXPORT_TOKEN:
         raise HTTPException(403, "Acesso negado")
 
     leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
+    xlsx_bytes = build_leads_xlsx(leads)
 
-    output = io.StringIO()
-    writer = csv.writer(output, delimiter=";")  # ; funciona melhor no Excel em pt-BR
-    writer.writerow([
-        "Data", "Funcionário", "Nome", "Sobrenome", "Empresa", "Cargo",
-        "Telefone", "Email", "Interesses", "Observações", "Classificação",
-        "Email Enviado", "WhatsApp Enviado",
-    ])
-    for l in leads:
-        writer.writerow([
-            l.created_at.strftime("%d/%m/%Y %H:%M") if l.created_at else "",
-            l.employee.name if l.employee else "",
-            l.first_name, l.last_name, l.company, l.position,
-            l.phone, l.email,
-            ", ".join(l.interests or []),
-            l.notes,
-            l.classification,
-            l.email_sent, l.whatsapp_sent,
-        ])
-
-    output.seek(0)
     return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=leads_epiq.csv"},
+        iter([xlsx_bytes]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=leads_epiq.xlsx"},
     )
 
 
 @app.get("/api/leads/report-now")
-def trigger_report_now(token: str = Query(...)):
-    if not EXPORT_TOKEN or token != EXPORT_TOKEN:
+def trigger_report_now(x_export_token: str = Header(None)):
+    if not EXPORT_TOKEN or (x_export_token or "").strip() != EXPORT_TOKEN:
         raise HTTPException(403, "Acesso negado")
     send_daily_report()
     return {"status": "relatório disparado, confira o e-mail em alguns instantes"}
