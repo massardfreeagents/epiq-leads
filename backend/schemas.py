@@ -29,15 +29,16 @@ class LeadCreate(BaseModel):
     company: str = ""
     position: str = ""
     phone: str = ""
-    email: str = ""
+    emails: List[str] = []
     interests: List[str] = []
     notes: str = ""
     classification: str  # A, B, C, D
     badge_photo_url: Optional[str] = None
 
-    @field_validator("email")
+    @field_validator("emails")
     @classmethod
-    def validate_email(cls, v):
-        if v and not EMAIL_REGEX.match(v):
-            raise ValueError("Email em formato inválido")
+    def validate_emails(cls, v):
+        for e in v:
+            if e and not EMAIL_REGEX.match(e):
+                raise ValueError(f"Email em formato inválido: {e}")
         return v
