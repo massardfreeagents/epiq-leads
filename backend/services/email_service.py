@@ -40,3 +40,32 @@ def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_
 
     resp = requests.post(BREVO_URL, json=payload, headers=headers, timeout=30)
     return resp.status_code in (200, 201)
+
+
+def send_report_email(to_emails: list, xlsx_bytes: bytes, sender_email: str, filename: str = "leads_epiq.xlsx") -> bool:
+    """
+    Envia a planilha de leads por e-mail para uma lista de destinatários.
+    O remetente precisa ser um e-mail já verificado como 'Single Sender' no Brevo.
+    """
+    xlsx_b64 = base64.b64encode(xlsx_bytes).decode()
+
+    payload = {
+        "sender": {"name": "Captura de Leads - Epiq", "email": sender_email},
+        "to": [{"email": e} for e in to_emails],
+        "subject": "Relatório diário de leads — Feira Epiq",
+        "htmlContent": """
+            <p>Olá,</p>
+            <p>Segue em anexo a planilha atualizada com todos os leads capturados até o momento
+            na feira.</p>
+        """,
+        "attachment": [{"content": xlsx_b64, "name": filename}],
+    }
+
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "accept": "application/json",
+    }
+
+    resp = requests.post(BREVO_URL, json=payload, headers=headers, timeout=30)
+    return resp.status_code in (200, 201)
