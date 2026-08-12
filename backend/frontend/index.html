@@ -281,42 +281,37 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
 
   // separa os e-mails por vírgula, remove espaços e valida cada um
   const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-  const rawEmails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
-  for (const e of rawEmails) {
+  const emails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
+  for (const e of emails) {
     if (!emailRegex.test(e)) {
       return alert(`O e-mail "${e}" não parece válido. Confira e corrija antes de salvar.`);
     }
   }
-  // se não informou nenhum e-mail, salva um único lead sem e-mail
-  const emailsToUse = rawEmails.length > 0 ? rawEmails : [''];
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   document.getElementById('status').innerText = 'Salvando e enviando...';
 
-  const basePayload = {
+  const payload = {
     employee_id: parseInt(employeeId),
     first_name: document.getElementById('first_name').value,
     last_name: document.getElementById('last_name').value,
     company: document.getElementById('company').value,
     position: document.getElementById('position').value,
     phone: document.getElementById('phone').value,
+    emails: emails,
     interests: Array.from(selectedInterests),
     notes: document.getElementById('notes').value,
     classification: selectedClass,
   };
 
-  let allOk = true;
-  for (const email of emailsToUse) {
-    const res = await fetch(`${API}/api/leads`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...basePayload, email }),
-    });
-    if (!res.ok) allOk = false;
-  }
+  const res = await fetch(`${API}/api/leads`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
 
-  if (allOk) {
-    const msg = emailsToUse.length > 1 ? `✅ ${emailsToUse.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
+  if (res.ok) {
+    const msg = emails.length > 1 ? `✅ ${emails.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
     showToast(msg);
     document.getElementById('status').innerText = '';
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
@@ -326,7 +321,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     selectedInterests.clear(); selectedClass = null;
     setTimeout(scrollToTop, 1800);
   } else {
-    document.getElementById('status').innerText = '❌ Erro ao salvar um ou mais registros. Tente novamente.';
+    document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
   }
   btn.disabled = false;
 });
