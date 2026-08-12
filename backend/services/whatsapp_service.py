@@ -29,7 +29,7 @@ def send_folder_document(to_phone: str) -> bool:
         "mimetype": "application/pdf",
         "media": pdf_b64,
         "fileName": "Folder-Epiq.pdf",
-        "caption": "Foi um prazer falar com você! Segue nosso folder institucional.",
+        "caption": "Foi um prazer falar com você em nosso estande. Segue nosso folder institucional e meus contatos (telefone e email) para você gravar aí! CONTE COM A GENTE!",
     }
     resp = requests.post(url, json=payload, headers=HEADERS, timeout=30)
     if resp.status_code not in (200, 201):
