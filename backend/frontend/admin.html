@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin - Leads Epiq</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, sans-serif; margin:0; background:#f4f5f7; color:#1a1a1a; }
+  header { background:#0d2b4e; color:#fff; padding:16px 20px; }
+  header h1 { font-size:17px; margin:0; }
+  .container { max-width:420px; margin:0 auto; padding:16px; }
+  input { width:100%; padding:12px; margin-bottom:12px; border:1px solid #d0d4da; border-radius:8px; font-size:15px; background:#fff; }
+  label { font-size:13px; font-weight:600; color:#444; display:block; margin-bottom:4px; }
+  .btn { width:100%; padding:14px; border:none; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; margin-bottom:12px; color:#fff; }
+  .btn-download { background:#0d2b4e; }
+  .btn-send { background:#1a7a3c; }
+  .btn:disabled { background:#9aa; }
+  #status { text-align:center; margin-top:10px; font-size:14px; }
+</style>
+</head>
+<body>
+<header><h1>Admin — Leads Epiq</h1></header>
+<div class="container">
+
+  <div class="field">
+    <label>Senha</label>
+    <input type="password" id="token" placeholder="Digite a senha">
+  </div>
+
+  <button class="btn btn-download" id="downloadBtn">⬇️ Baixar planilha (CSV)</button>
+  <button class="btn btn-send" id="sendBtn">📧 Enviar relatório por e-mail agora</button>
+
+  <div id="status"></div>
+</div>
+
+<script>
+const API = "";
+const tokenInput = document.getElementById('token');
+
+// lembra a senha nesta sessão do navegador, pra não digitar toda vez
+const saved = sessionStorage.getItem('export_token');
+if (saved) tokenInput.value = saved;
+
+document.getElementById('downloadBtn').addEventListener('click', async () => {
+  const token = tokenInput.value.trim();
+  if (!token) return alert('Digite a senha.');
+  document.getElementById('status').innerText = 'Baixando...';
+
+  const res = await fetch(`${API}/api/leads/export`, {
+    headers: { 'X-Export-Token': token }
+  });
+
+  if (res.status === 403) {
+    document.getElementById('status').innerText = '❌ Senha incorreta.';
+    return;
+  }
+  if (!res.ok) {
+    document.getElementById('status').innerText = '❌ Erro ao baixar.';
+    return;
+  }
+
+  sessionStorage.setItem('export_token', token);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'leads_epiq.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  document.getElementById('status').innerText = '✅ Download concluído.';
+});
+
+document.getElementById('sendBtn').addEventListener('click', async () => {
+  const token = tokenInput.value.trim();
+  if (!token) return alert('Digite a senha.');
+  document.getElementById('status').innerText = 'Enviando...';
+
+  const res = await fetch(`${API}/api/leads/report-now`, {
+    headers: { 'X-Export-Token': token }
+  });
+
+  if (res.status === 403) {
+    document.getElementById('status').innerText = '❌ Senha incorreta.';
+    return;
+  }
+  if (!res.ok) {
+    document.getElementById('status').innerText = '❌ Erro ao enviar.';
+    return;
+  }
+
+  sessionStorage.setItem('export_token', token);
+  document.getElementById('status').innerText = '✅ Relatório disparado! Confira o e-mail em instantes.';
+});
+</script>
+</body>
+</html>
