@@ -5,7 +5,7 @@ import requests
 EVOLUTION_BASE_URL = os.environ["EVOLUTION_BASE_URL"]  # ex: https://evolution-api-xxx.up.railway.app
 EVOLUTION_INSTANCE = os.environ["EVOLUTION_INSTANCE"]
 EVOLUTION_API_KEY = os.environ["EVOLUTION_API_KEY"]
-FOLDER_PDF_PATH = os.environ.get("FOLDER_PDF_PATH", "folder_temp.pdf")
+FOLDER_PDF_PATH = os.environ.get("FOLDER_PDF_PATH", "Epiq - Apresentacao.pdf")
 
 HEADERS = {"apikey": EVOLUTION_API_KEY, "Content-Type": "application/json"}
 
