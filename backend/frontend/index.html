@@ -72,7 +72,7 @@
   <div class="field"><label>Empresa</label><input id="company"></div>
   <div class="field"><label>Cargo</label><input id="position"></div>
   <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..."></div>
-  <div class="field"><label>Email</label><input id="email"></div>
+  <div class="field"><label>Email</label><input id="email" type="email"></div>
 
   <label>Interesse em:</label>
   <div class="interests" id="interests">
@@ -241,6 +241,12 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   if (!employeeId) return alert('Selecione o funcionário.');
   if (!document.getElementById('first_name').value) return alert('Preencha ao menos o nome.');
   if (!selectedClass) return alert('Selecione a classificação (A, B, C ou D).');
+
+  const emailValue = document.getElementById('email').value.trim();
+  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  if (emailValue && !emailRegex.test(emailValue)) {
+    return alert('O e-mail informado não parece válido. Confira e corrija antes de salvar.');
+  }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
