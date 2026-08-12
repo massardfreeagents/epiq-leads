@@ -49,6 +49,14 @@
   }
   .submit-btn:disabled { background: #9aa; }
   #status { text-align: center; margin-top: 12px; font-size: 14px; }
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: #1a7a3c; color: #fff; padding: 14px 24px; border-radius: 10px;
+    font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none; z-index: 1000; max-width: 90%; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -56,6 +64,8 @@
   <h1>Captura de Leads — Epiq</h1>
   <a href="/cadastro.html">Meu cadastro</a>
 </header>
+
+<div class="toast" id="toast"></div>
 
 <div class="container">
 
@@ -160,6 +170,17 @@ function normalizePhoneDisplay(phone) {
   if (trimmed.startsWith('+55')) return trimmed;
   if (trimmed.startsWith('55') && trimmed.length >= 12) return '+' + trimmed;
   return '+55 ' + trimmed;
+}
+
+// Mostra um aviso flutuante que some sozinho
+function showToast(message, duration = 2000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, duration);
 }
 
 // carregar funcionários
@@ -280,7 +301,8 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   });
 
   if (res.ok) {
-    document.getElementById('status').innerText = '✅ Lead salvo! Folder sendo enviado.';
+    showToast('✅ Lead salvo com sucesso!');
+    document.getElementById('status').innerText = '';
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('phone').value = '+55 ';
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
