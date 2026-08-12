@@ -165,33 +165,62 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
     employee_email = employee.email
     employee_phone = employee.phone
 
-    db_lead = models.Lead(**lead.dict())
-    db.add(db_lead)
-    db.commit()
-    db.refresh(db_lead)
-    lead_id = db_lead.id
+    emails = [e.strip() for e in lead.emails if e.strip()] or [""]
+
+    lead_ids = []
+    for email in emails:
+        db_lead = models.Lead(
+            employee_id=lead.employee_id,
+            first_name=lead.first_name,
+            last_name=lead.last_name,
+            company=lead.company,
+            position=lead.position,
+            phone=lead.phone,
+            email=email,
+            interests=lead.interests,
+            notes=lead.notes,
+            classification=lead.classification,
+            badge_photo_url=lead.badge_photo_url,
+        )
+        db.add(db_lead)
+        db.commit()
+        db.refresh(db_lead)
+        lead_ids.append(db_lead.id)
+
+    full_name = f"{lead.first_name} {lead.last_name}".strip()
+    lead_phone = lead.phone
 
     def _send():
-        full_name = f"{lead.first_name} {lead.last_name}".strip()
-        email_ok = True
+        # e-mail: um envio por endereço informado
+        for lid, email in zip(lead_ids, emails):
+            if not email:
+                continue
+            ok = send_folder_email(email, full_name, employee_name, employee_email, employee_phone)
+            local_db = SessionLocal()
+            try:
+                db_lead_local = local_db.query(models.Lead).get(lid)
+                db_lead_local.email_sent = "sent" if ok else "failed"
+                local_db.commit()
+            finally:
+                local_db.close()
+
+        # WhatsApp: enviado UMA ÚNICA VEZ, independente de quantos e-mails foram informados
         wpp_ok = True
-        if lead.email:
-            email_ok = send_folder_email(lead.email, full_name, employee_name, employee_email)
-        if lead.phone:
-            wpp_ok = notify_lead(lead.phone, employee_name, employee_phone, employee_email)
+        if lead_phone:
+            wpp_ok = notify_lead(lead_phone, employee_name, employee_phone, employee_email)
 
         local_db = SessionLocal()
         try:
-            db_lead_local = local_db.query(models.Lead).get(lead_id)
-            db_lead_local.email_sent = "sent" if email_ok else "failed"
-            db_lead_local.whatsapp_sent = "sent" if wpp_ok else "failed"
+            for lid in lead_ids:
+                db_lead_local = local_db.query(models.Lead).get(lid)
+                db_lead_local.whatsapp_sent = "sent" if wpp_ok else "failed"
             local_db.commit()
         finally:
             local_db.close()
 
     background_tasks.add_task(_send)
 
-    return {"id": lead_id, "status": "created"}
+    return {"ids": lead_ids, "status": "created"}
 
 
 @app.get("/api/leads")
