@@ -183,6 +183,13 @@ function showToast(message, duration = 2000) {
   }, duration);
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  // fallback pra navegadores que ignoram o smooth acima
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
 // carregar funcionários
 fetch(`${API}/api/employees`).then(r => r.json()).then(list => {
   const sel = document.getElementById('employeeSelect');
@@ -308,9 +315,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
     selectedInterests.clear(); selectedClass = null;
-    setTimeout(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }, 2000);
+    setTimeout(scrollToTop, 1800);
   } else {
     document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
   }
