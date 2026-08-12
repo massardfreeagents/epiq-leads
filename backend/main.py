@@ -1,10 +1,13 @@
 import os
 import uuid
 import shutil
+import csv
+import io
 
 from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from database import Base, engine, get_db
@@ -173,6 +176,37 @@ def list_leads(db: Session = Depends(get_db)):
             "created_at": l.created_at.isoformat(),
         })
     return result
+
+
+@app.get("/api/leads/export")
+def export_leads_csv(db: Session = Depends(get_db)):
+    leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")  # ; funciona melhor no Excel em pt-BR
+    writer.writerow([
+        "Data", "Funcionário", "Nome", "Sobrenome", "Empresa", "Cargo",
+        "Telefone", "Email", "Interesses", "Observações", "Classificação",
+        "Email Enviado", "WhatsApp Enviado",
+    ])
+    for l in leads:
+        writer.writerow([
+            l.created_at.strftime("%d/%m/%Y %H:%M") if l.created_at else "",
+            l.employee.name if l.employee else "",
+            l.first_name, l.last_name, l.company, l.position,
+            l.phone, l.email,
+            ", ".join(l.interests or []),
+            l.notes,
+            l.classification,
+            l.email_sent, l.whatsapp_sent,
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=leads_epiq.csv"},
+    )
 
 
 # ---------- Servir o frontend ----------
