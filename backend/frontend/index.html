@@ -71,7 +71,7 @@
   <div class="field"><label>Sobrenome</label><input id="last_name"></div>
   <div class="field"><label>Empresa</label><input id="company"></div>
   <div class="field"><label>Cargo</label><input id="position"></div>
-  <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..."></div>
+  <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..." value="+55 "></div>
   <div class="field"><label>Email</label><input id="email" type="email"></div>
 
   <label>Interesse em:</label>
@@ -153,6 +153,15 @@ function compressImage(file, maxDim = 1280, quality = 0.75) {
   });
 }
 
+// Garante que o telefone sempre comece com +55 (mesmo vindo do OCR)
+function normalizePhoneDisplay(phone) {
+  const trimmed = (phone || '').trim();
+  if (!trimmed) return '+55 ';
+  if (trimmed.startsWith('+55')) return trimmed;
+  if (trimmed.startsWith('55') && trimmed.length >= 12) return '+' + trimmed;
+  return '+55 ' + trimmed;
+}
+
 // carregar funcionários
 fetch(`${API}/api/employees`).then(r => r.json()).then(list => {
   const sel = document.getElementById('employeeSelect');
@@ -200,7 +209,7 @@ document.getElementById('badgeInput').addEventListener('change', async (e) => {
   document.getElementById('last_name').value = formatName(data.last_name || '');
   document.getElementById('company').value = formatName(data.company || '');
   document.getElementById('position').value = formatName(data.position || '');
-  document.getElementById('phone').value = data.phone || '';
+  document.getElementById('phone').value = normalizePhoneDisplay(data.phone || '');
   document.getElementById('email').value = (data.email || '').toLowerCase();
   document.getElementById('status').innerText = 'Confira e ajuste os campos abaixo.';
 });
@@ -273,6 +282,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   if (res.ok) {
     document.getElementById('status').innerText = '✅ Lead salvo! Folder sendo enviado.';
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('phone').value = '+55 ';
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
     selectedInterests.clear(); selectedClass = null;
