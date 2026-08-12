@@ -28,7 +28,7 @@
     <input type="password" id="token" placeholder="Digite a senha">
   </div>
 
-  <button class="btn btn-download" id="downloadBtn">⬇️ Baixar planilha (CSV)</button>
+  <button class="btn btn-download" id="downloadBtn">⬇️ Baixar planilha (XLSX)</button>
   <button class="btn btn-send" id="sendBtn">📧 Enviar relatório por e-mail agora</button>
 
   <div id="status"></div>
@@ -65,7 +65,7 @@ document.getElementById('downloadBtn').addEventListener('click', async () => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'leads_epiq.csv';
+  a.download = 'leads_epiq.xlsx';
   document.body.appendChild(a);
   a.click();
   a.remove();
