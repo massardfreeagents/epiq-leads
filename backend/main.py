@@ -160,29 +160,38 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
     if not employee:
         raise HTTPException(404, "Funcionário não encontrado")
 
+    # captura os dados ANTES de sair da sessão, pra evitar DetachedInstanceError
+    employee_name = employee.name
+    employee_email = employee.email
+    employee_phone = employee.phone
+
     db_lead = models.Lead(**lead.dict())
     db.add(db_lead)
     db.commit()
     db.refresh(db_lead)
+    lead_id = db_lead.id
 
     def _send():
         full_name = f"{lead.first_name} {lead.last_name}".strip()
         email_ok = True
         wpp_ok = True
         if lead.email:
-            email_ok = send_folder_email(lead.email, full_name, employee.name, employee.email)
+            email_ok = send_folder_email(lead.email, full_name, employee_name, employee_email)
         if lead.phone:
-            wpp_ok = notify_lead(lead.phone, employee.name, employee.phone, employee.email)
+            wpp_ok = notify_lead(lead.phone, employee_name, employee_phone, employee_email)
 
-        local_db = next(get_db())
-        db_lead_local = local_db.query(models.Lead).get(db_lead.id)
-        db_lead_local.email_sent = "sent" if email_ok else "failed"
-        db_lead_local.whatsapp_sent = "sent" if wpp_ok else "failed"
-        local_db.commit()
+        local_db = SessionLocal()
+        try:
+            db_lead_local = local_db.query(models.Lead).get(lead_id)
+            db_lead_local.email_sent = "sent" if email_ok else "failed"
+            db_lead_local.whatsapp_sent = "sent" if wpp_ok else "failed"
+            local_db.commit()
+        finally:
+            local_db.close()
 
     background_tasks.add_task(_send)
 
-    return {"id": db_lead.id, "status": "created"}
+    return {"id": lead_id, "status": "created"}
 
 
 @app.get("/api/leads")
