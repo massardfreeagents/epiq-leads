@@ -3,7 +3,7 @@ import base64
 import requests
 
 BREVO_API_KEY = os.environ["BREVO_API_KEY"]
-FOLDER_PDF_PATH = os.environ.get("FOLDER_PDF_PATH", "folder_temp.pdf")
+FOLDER_PDF_PATH = os.environ.get("FOLDER_PDF_PATH", "Epiq - Apresentacao.pdf")
 
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
