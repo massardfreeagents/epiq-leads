@@ -245,5 +245,13 @@ def export_leads_csv(token: str = Query(...), db: Session = Depends(get_db)):
     )
 
 
+@app.get("/api/leads/report-now")
+def trigger_report_now(token: str = Query(...)):
+    if not EXPORT_TOKEN or token != EXPORT_TOKEN:
+        raise HTTPException(403, "Acesso negado")
+    send_daily_report()
+    return {"status": "relatório disparado, confira o e-mail em alguns instantes"}
+
+
 # ---------- Servir o frontend ----------
 app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
