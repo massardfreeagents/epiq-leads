@@ -32,6 +32,8 @@ def send_folder_document(to_phone: str) -> bool:
         "caption": "Foi um prazer falar com você! Segue nosso folder institucional.",
     }
     resp = requests.post(url, json=payload, headers=HEADERS, timeout=30)
+    if resp.status_code not in (200, 201):
+        print(f"[EVOLUTION sendMedia ERROR] status={resp.status_code} body={resp.text} url={url}")
     return resp.status_code in (200, 201)
 
 
@@ -51,6 +53,8 @@ def send_employee_contact(to_phone: str, employee_name: str, employee_phone: str
         ],
     }
     resp = requests.post(url, json=payload, headers=HEADERS, timeout=30)
+    if resp.status_code not in (200, 201):
+        print(f"[EVOLUTION sendContact ERROR] status={resp.status_code} body={resp.text} url={url}")
     return resp.status_code in (200, 201)
 
 
