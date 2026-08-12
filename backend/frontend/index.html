@@ -308,6 +308,9 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
     selectedInterests.clear(); selectedClass = null;
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 2000);
   } else {
     document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
   }
