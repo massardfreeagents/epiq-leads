@@ -9,8 +9,9 @@ genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 MODEL_NAME = "gemini-3.1-flash-lite"
 
 PROMPT = """
-Você está vendo a foto de um crachá de visitante/participante de uma feira de negócios.
-Extraia as informações visíveis e devolva APENAS um JSON válido, sem markdown, sem texto
+Você está vendo a foto de um crachá de participante de um evento/congresso.
+
+Extraia as informações e devolva APENAS um JSON válido, sem markdown, sem texto
 adicional, no seguinte formato exato:
 
 {
@@ -21,6 +22,16 @@ adicional, no seguinte formato exato:
   "phone": "",
   "email": ""
 }
+
+Atenção especial ao campo "position" (cargo):
+- Muitos crachás de evento têm uma "categoria de credenciamento" impressa, como
+  Congressista, Palestrante, Expositor, Visitante, Imprensa, Convidado, VIP, Staff.
+  ISSO NÃO É O CARGO DA PESSOA — é apenas o tipo de credencial dela no evento.
+  NUNCA coloque esse tipo de palavra no campo "position".
+- O campo "position" deve conter apenas o cargo profissional da pessoa na empresa
+  dela (ex: "Gerente de Compliance", "Diretor Jurídico", "Analista de Auditoria").
+- Se o crachá não mostrar claramente o cargo profissional da pessoa (só mostrar a
+  categoria do evento), devolva "position": "" (vazio) — não tente adivinhar.
 
 Se algum campo não estiver visível no crachá, devolva string vazia "" para ele.
 Não invente informações que não estejam na imagem.
