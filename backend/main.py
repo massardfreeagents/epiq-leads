@@ -4,24 +4,57 @@ import shutil
 import csv
 import io
 
-from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, UploadFile, File, Form, HTTPException, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
-from database import Base, engine, get_db
+from database import Base, engine, get_db, SessionLocal
 import models
 import schemas
 from services.ocr import extract_badge_data
 from services.transcribe import transcribe_audio
-from services.email_service import send_folder_email
+from services.email_service import send_folder_email, send_report_email
 from services.whatsapp_service import notify_lead
+from services.report import build_leads_xlsx
 
 Base.metadata.create_all(bind=engine)
 
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+# ---------- Relatório diário automático (18-20/08/2026, 20h Brasília) ----------
+
+REPORT_RECIPIENTS = ["bruno.massard@epiqglobal.com", "yuri.medeiros@epiqglobal.com"]
+REPORT_SENDER = "bruno.massard@epiqglobal.com"  # precisa estar verificado como Single Sender no Brevo
+EXPORT_TOKEN = os.environ.get("EXPORT_TOKEN", "")  # senha simples pro link manual de exportação
+
+
+def send_daily_report():
+    db = SessionLocal()
+    try:
+        leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
+        xlsx_bytes = build_leads_xlsx(leads)
+        send_report_email(REPORT_RECIPIENTS, xlsx_bytes, REPORT_SENDER)
+    finally:
+        db.close()
+
+
+scheduler = BackgroundScheduler(timezone="America/Sao_Paulo")
+scheduler.add_job(
+    send_daily_report,
+    CronTrigger(
+        hour=20, minute=0,
+        start_date="2026-08-18 00:00:00",
+        end_date="2026-08-20 23:59:59",
+        timezone="America/Sao_Paulo",
+    ),
+    id="daily_leads_report",
+)
+scheduler.start()
 
 app = FastAPI(title="ForExperts / Epiq - Captura de Leads")
 
@@ -179,7 +212,10 @@ def list_leads(db: Session = Depends(get_db)):
 
 
 @app.get("/api/leads/export")
-def export_leads_csv(db: Session = Depends(get_db)):
+def export_leads_csv(token: str = Query(...), db: Session = Depends(get_db)):
+    if not EXPORT_TOKEN or token != EXPORT_TOKEN:
+        raise HTTPException(403, "Acesso negado")
+
     leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
 
     output = io.StringIO()
