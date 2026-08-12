@@ -30,7 +30,6 @@
     margin-bottom: 12px; cursor: pointer;
   }
   .mic-btn.recording { background: #c0392b; }
-  .badge-preview { width: 100%; border-radius: 8px; margin-bottom: 12px; display: none; }
   .interests { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .interest-tag {
     padding: 8px 12px; border-radius: 20px; border: 1px solid #0d2b4e;
@@ -67,7 +66,6 @@
 
   <button class="camera-btn" onclick="document.getElementById('badgeInput').click()">📷 Tirar foto do crachá</button>
   <input type="file" id="badgeInput" accept="image/*" capture="environment" style="display:none">
-  <img id="badgePreview" class="badge-preview">
 
   <div class="field"><label>Nome</label><input id="first_name"></div>
   <div class="field"><label>Sobrenome</label><input id="last_name"></div>
@@ -96,7 +94,6 @@
   </div>
   <button class="mic-btn" id="micBtn">🎤 Gravar observação por voz</button>
 
-  <label>Classificação do lead</label>
   <div class="classification" id="classification">
     <div class="class-circle" data-value="A">A</div>
     <div class="class-circle" data-value="B">B</div>
@@ -112,7 +109,6 @@
 const API = ""; // mesma origem
 let selectedInterests = new Set();
 let selectedClass = null;
-let badgePhotoUrl = null;
 
 // carregar funcionários
 fetch(`${API}/api/employees`).then(r => r.json()).then(list => {
@@ -144,20 +140,12 @@ document.querySelectorAll('.class-circle').forEach(c => {
   });
 });
 
-// foto do crachá -> upload + OCR
+// foto do crachá -> só OCR, não salva nem mostra a foto
 document.getElementById('badgeInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const preview = document.getElementById('badgePreview');
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = 'block';
 
   document.getElementById('status').innerText = 'Lendo crachá...';
-
-  const uploadForm = new FormData();
-  uploadForm.append('file', file);
-  fetch(`${API}/api/badge-photo`, { method: 'POST', body: uploadForm })
-    .then(r => r.json()).then(d => badgePhotoUrl = d.url);
 
   const ocrForm = new FormData();
   ocrForm.append('file', file);
@@ -224,7 +212,6 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     interests: Array.from(selectedInterests),
     notes: document.getElementById('notes').value,
     classification: selectedClass,
-    badge_photo_url: badgePhotoUrl,
   };
 
   const res = await fetch(`${API}/api/leads`, {
@@ -237,8 +224,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
-    selectedInterests.clear(); selectedClass = null; badgePhotoUrl = null;
-    document.getElementById('badgePreview').style.display = 'none';
+    selectedInterests.clear(); selectedClass = null;
   } else {
     document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
   }
