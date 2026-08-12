@@ -30,7 +30,6 @@
     margin-bottom: 12px; cursor: pointer;
   }
   .mic-btn.recording { background: #c0392b; }
-  .badge-preview { width: 100%; border-radius: 8px; margin-bottom: 12px; display: none; }
   .interests { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
   .interest-tag {
     padding: 8px 12px; border-radius: 20px; border: 1px solid #0d2b4e;
@@ -50,6 +49,14 @@
   }
   .submit-btn:disabled { background: #9aa; }
   #status { text-align: center; margin-top: 12px; font-size: 14px; }
+  .toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    background: #1a7a3c; color: #fff; padding: 14px 24px; border-radius: 10px;
+    font-size: 15px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    opacity: 0; transition: opacity 0.3s ease, transform 0.3s ease;
+    pointer-events: none; z-index: 1000; max-width: 90%; text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 </style>
 </head>
 <body>
@@ -57,6 +64,8 @@
   <h1>Captura de Leads — Epiq</h1>
   <a href="/cadastro.html">Meu cadastro</a>
 </header>
+
+<div class="toast" id="toast"></div>
 
 <div class="container">
 
@@ -67,14 +76,13 @@
 
   <button class="camera-btn" onclick="document.getElementById('badgeInput').click()">📷 Tirar foto do crachá</button>
   <input type="file" id="badgeInput" accept="image/*" capture="environment" style="display:none">
-  <img id="badgePreview" class="badge-preview">
 
   <div class="field"><label>Nome</label><input id="first_name"></div>
   <div class="field"><label>Sobrenome</label><input id="last_name"></div>
   <div class="field"><label>Empresa</label><input id="company"></div>
   <div class="field"><label>Cargo</label><input id="position"></div>
-  <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..."></div>
-  <div class="field"><label>Email</label><input id="email"></div>
+  <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..." value="+55 "></div>
+  <div class="field"><label>Email (pode informar mais de um, separados por vírgula)</label><input id="email" type="text" placeholder="nome@empresa.com, outro@empresa.com"></div>
 
   <label>Interesse em:</label>
   <div class="interests" id="interests">
@@ -88,6 +96,8 @@
     <div class="interest-tag" data-value="MSA">MSA</div>
     <div class="interest-tag" data-value="Pediu apresentação">Pediu apresentação</div>
     <div class="interest-tag" data-value="Curso">Curso</div>
+    <div class="interest-tag" data-value="FTO/Org. Criminosa">FTO/Org. Criminosa</div>
+    <div class="interest-tag" data-value="Monit. Comunicações">Monit. Comunicações</div>
   </div>
 
   <div class="field">
@@ -96,7 +106,6 @@
   </div>
   <button class="mic-btn" id="micBtn">🎤 Gravar observação por voz</button>
 
-  <label>Classificação do lead</label>
   <div class="classification" id="classification">
     <div class="class-circle" data-value="A">A</div>
     <div class="class-circle" data-value="B">B</div>
@@ -112,7 +121,76 @@
 const API = ""; // mesma origem
 let selectedInterests = new Set();
 let selectedClass = null;
-let badgePhotoUrl = null;
+
+// ---------- Utilitários ----------
+
+// Capitaliza como nome próprio em português: "joão de araujo" -> "João de Araujo"
+const LOWERCASE_WORDS = ['de', 'da', 'do', 'das', 'dos', 'e'];
+function formatName(str) {
+  if (!str) return str;
+  const words = str.trim().toLowerCase().split(/\s+/);
+  return words.map((w, i) => {
+    if (i > 0 && LOWERCASE_WORDS.includes(w)) return w;
+    return w.charAt(0).toUpperCase() + w.slice(1);
+  }).join(' ');
+}
+
+// Aplica formatação automática ao sair do campo (para digitação manual)
+['first_name', 'last_name', 'company', 'position'].forEach(id => {
+  document.getElementById(id).addEventListener('blur', (e) => {
+    e.target.value = formatName(e.target.value);
+  });
+});
+
+// Comprime a foto no celular antes de enviar, pra acelerar o OCR
+function compressImage(file, maxDim = 1280, quality = 0.75) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxDim) {
+        height = Math.round(height * (maxDim / width));
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = Math.round(width * (maxDim / height));
+        height = maxDim;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Garante que o telefone sempre comece com +55 (mesmo vindo do OCR)
+function normalizePhoneDisplay(phone) {
+  const trimmed = (phone || '').trim();
+  if (!trimmed) return '+55 ';
+  if (trimmed.startsWith('+55')) return trimmed;
+  if (trimmed.startsWith('55') && trimmed.length >= 12) return '+' + trimmed;
+  return '+55 ' + trimmed;
+}
+
+// Mostra um aviso flutuante que some sozinho
+function showToast(message, duration = 2000) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => {
+    toast.classList.remove('show');
+  }, duration);
+}
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+  // fallback pra navegadores que ignoram o smooth acima
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
 
 // carregar funcionários
 fetch(`${API}/api/employees`).then(r => r.json()).then(list => {
@@ -144,31 +222,25 @@ document.querySelectorAll('.class-circle').forEach(c => {
   });
 });
 
-// foto do crachá -> upload + OCR
+// foto do crachá -> só OCR, não salva nem mostra a foto
 document.getElementById('badgeInput').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  const preview = document.getElementById('badgePreview');
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = 'block';
 
   document.getElementById('status').innerText = 'Lendo crachá...';
 
-  const uploadForm = new FormData();
-  uploadForm.append('file', file);
-  fetch(`${API}/api/badge-photo`, { method: 'POST', body: uploadForm })
-    .then(r => r.json()).then(d => badgePhotoUrl = d.url);
+  const compressed = await compressImage(file);
 
   const ocrForm = new FormData();
-  ocrForm.append('file', file);
+  ocrForm.append('file', compressed, 'badge.jpg');
   const res = await fetch(`${API}/api/ocr`, { method: 'POST', body: ocrForm });
   const data = await res.json();
-  document.getElementById('first_name').value = data.first_name || '';
-  document.getElementById('last_name').value = data.last_name || '';
-  document.getElementById('company').value = data.company || '';
-  document.getElementById('position').value = data.position || '';
-  document.getElementById('phone').value = data.phone || '';
-  document.getElementById('email').value = data.email || '';
+  document.getElementById('first_name').value = formatName(data.first_name || '');
+  document.getElementById('last_name').value = formatName(data.last_name || '');
+  document.getElementById('company').value = formatName(data.company || '');
+  document.getElementById('position').value = formatName(data.position || '');
+  document.getElementById('phone').value = normalizePhoneDisplay(data.phone || '');
+  document.getElementById('email').value = (data.email || '').toLowerCase();
   document.getElementById('status').innerText = 'Confira e ajuste os campos abaixo.';
 });
 
@@ -209,6 +281,15 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   if (!document.getElementById('first_name').value) return alert('Preencha ao menos o nome.');
   if (!selectedClass) return alert('Selecione a classificação (A, B, C ou D).');
 
+  // separa os e-mails por vírgula, remove espaços e valida cada um
+  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+  const emails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
+  for (const e of emails) {
+    if (!emailRegex.test(e)) {
+      return alert(`O e-mail "${e}" não parece válido. Confira e corrija antes de salvar.`);
+    }
+  }
+
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   document.getElementById('status').innerText = 'Salvando e enviando...';
@@ -220,11 +301,10 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     company: document.getElementById('company').value,
     position: document.getElementById('position').value,
     phone: document.getElementById('phone').value,
-    email: document.getElementById('email').value,
+    emails: emails,
     interests: Array.from(selectedInterests),
     notes: document.getElementById('notes').value,
     classification: selectedClass,
-    badge_photo_url: badgePhotoUrl,
   };
 
   const res = await fetch(`${API}/api/leads`, {
@@ -233,12 +313,15 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   });
 
   if (res.ok) {
-    document.getElementById('status').innerText = '✅ Lead salvo! Folder sendo enviado.';
+    const msg = emails.length > 1 ? `✅ ${emails.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
+    showToast(msg);
+    document.getElementById('status').innerText = '';
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('phone').value = '+55 ';
     document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
-    selectedInterests.clear(); selectedClass = null; badgePhotoUrl = null;
-    document.getElementById('badgePreview').style.display = 'none';
+    selectedInterests.clear(); selectedClass = null;
+    setTimeout(scrollToTop, 1800);
   } else {
     document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
   }
