@@ -39,6 +39,8 @@ def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_
     }
 
     resp = requests.post(BREVO_URL, json=payload, headers=headers, timeout=30)
+    if resp.status_code not in (200, 201):
+        print(f"[BREVO ERROR] status={resp.status_code} body={resp.text}")
     return resp.status_code in (200, 201)
 
 
@@ -68,4 +70,6 @@ def send_report_email(to_emails: list, xlsx_bytes: bytes, sender_email: str, fil
     }
 
     resp = requests.post(BREVO_URL, json=payload, headers=headers, timeout=30)
+    if resp.status_code not in (200, 201):
+        print(f"[BREVO REPORT ERROR] status={resp.status_code} body={resp.text}")
     return resp.status_code in (200, 201)
