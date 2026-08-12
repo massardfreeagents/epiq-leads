@@ -82,7 +82,7 @@
   <div class="field"><label>Empresa</label><input id="company"></div>
   <div class="field"><label>Cargo</label><input id="position"></div>
   <div class="field"><label>Telefone</label><input id="phone" placeholder="+55..." value="+55 "></div>
-  <div class="field"><label>Email</label><input id="email" type="email"></div>
+  <div class="field"><label>Email (pode informar mais de um, separados por vírgula)</label><input id="email" type="text" placeholder="nome@empresa.com, outro@empresa.com"></div>
 
   <label>Interesse em:</label>
   <div class="interests" id="interests">
@@ -279,36 +279,45 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
   if (!document.getElementById('first_name').value) return alert('Preencha ao menos o nome.');
   if (!selectedClass) return alert('Selecione a classificação (A, B, C ou D).');
 
-  const emailValue = document.getElementById('email').value.trim();
+  // separa os e-mails por vírgula, remove espaços e valida cada um
   const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-  if (emailValue && !emailRegex.test(emailValue)) {
-    return alert('O e-mail informado não parece válido. Confira e corrija antes de salvar.');
+  const rawEmails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
+  for (const e of rawEmails) {
+    if (!emailRegex.test(e)) {
+      return alert(`O e-mail "${e}" não parece válido. Confira e corrija antes de salvar.`);
+    }
   }
+  // se não informou nenhum e-mail, salva um único lead sem e-mail
+  const emailsToUse = rawEmails.length > 0 ? rawEmails : [''];
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   document.getElementById('status').innerText = 'Salvando e enviando...';
 
-  const payload = {
+  const basePayload = {
     employee_id: parseInt(employeeId),
     first_name: document.getElementById('first_name').value,
     last_name: document.getElementById('last_name').value,
     company: document.getElementById('company').value,
     position: document.getElementById('position').value,
     phone: document.getElementById('phone').value,
-    email: document.getElementById('email').value,
     interests: Array.from(selectedInterests),
     notes: document.getElementById('notes').value,
     classification: selectedClass,
   };
 
-  const res = await fetch(`${API}/api/leads`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  let allOk = true;
+  for (const email of emailsToUse) {
+    const res = await fetch(`${API}/api/leads`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...basePayload, email }),
+    });
+    if (!res.ok) allOk = false;
+  }
 
-  if (res.ok) {
-    showToast('✅ Lead salvo com sucesso!');
+  if (allOk) {
+    const msg = emailsToUse.length > 1 ? `✅ ${emailsToUse.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
+    showToast(msg);
     document.getElementById('status').innerText = '';
     ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('phone').value = '+55 ';
@@ -317,7 +326,7 @@ document.getElementById('submitBtn').addEventListener('click', async () => {
     selectedInterests.clear(); selectedClass = null;
     setTimeout(scrollToTop, 1800);
   } else {
-    document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
+    document.getElementById('status').innerText = '❌ Erro ao salvar um ou mais registros. Tente novamente.';
   }
   btn.disabled = false;
 });
