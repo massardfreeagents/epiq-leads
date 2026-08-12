@@ -176,4 +176,4 @@ def list_leads(db: Session = Depends(get_db)):
 
 
 # ---------- Servir o frontend ----------
-app.mount("/", StaticFiles(directory="../frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
