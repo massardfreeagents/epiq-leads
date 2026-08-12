@@ -1,5 +1,6 @@
 import os
 import base64
+import re
 import requests
 
 BREVO_API_KEY = os.environ["BREVO_API_KEY"]
@@ -8,7 +9,20 @@ FOLDER_PDF_PATH = os.environ.get("FOLDER_PDF_PATH", "Epiq - Apresentacao.pdf")
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 
-def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_email: str) -> bool:
+def format_phone_display(phone: str) -> str:
+    """Converte 5521972909065 -> +55 (21) 97290-9065"""
+    digits = re.sub(r"\D", "", phone or "")
+    if digits.startswith("55") and len(digits) in (12, 13):
+        area = digits[2:4]
+        number = digits[4:]
+        if len(number) == 9:
+            return f"+55 ({area}) {number[:5]}-{number[5:]}"
+        if len(number) == 8:
+            return f"+55 ({area}) {number[:4]}-{number[4:]}"
+    return phone or ""
+
+
+def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_email: str, employee_phone: str = "") -> bool:
     """
     Envia o PDF do folder por e-mail.
     O remetente (from) é o e-mail real do funcionário — precisa estar
@@ -16,6 +30,8 @@ def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_
     """
     with open(FOLDER_PDF_PATH, "rb") as f:
         pdf_b64 = base64.b64encode(f.read()).decode()
+
+    phone_line = f"<br>Tel: {format_phone_display(employee_phone)}" if employee_phone else ""
 
     payload = {
         "sender": {"name": employee_name, "email": employee_email},
@@ -27,7 +43,7 @@ def send_folder_email(to_email: str, to_name: str, employee_name: str, employee_
             <p>Foi um prazer conversar com você em nosso estande. Segue em anexo nosso folder
             institucional com mais informações.</p>
             <p>Qualquer dúvida, pode responder diretamente este e-mail.</p>
-            <p>Abraço,<br>{employee_name}<br>Epiq</p>
+            <p>Abraço,<br>{employee_name}<br>Epiq{phone_line}</p>
         """,
         "attachment": [{"content": pdf_b64, "name": "Folder-Epiq.pdf"}],
     }
