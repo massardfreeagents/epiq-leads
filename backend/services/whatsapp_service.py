@@ -74,11 +74,17 @@ def send_text_message(to_phone: str, text: str) -> bool:
 
 def notify_hot_lead(yuri_phone: str, summary_text: str, lead_name: str, lead_company: str,
                      lead_position: str, lead_phone: str, lead_email: str) -> bool:
-    """Envia resumo em texto + cartão de contato do lead para o Yuri, quando classificado A ou B."""
-    ok1 = send_text_message(yuri_phone, summary_text)
+    """Envia resumo em texto + cartão de contato do lead para o Yuri, quando classificado A ou B.
+    Envolve o bloco com separadores de asterisco pra facilitar identificar qual contato pertence
+    a qual mensagem, já que várias chegam seguidas."""
+    separator = "**************"
+    message_with_header = f"{separator}\n{summary_text}"
+
+    ok1 = send_text_message(yuri_phone, message_with_header)
     organization = f"{lead_company} - {lead_position}" if lead_position else lead_company
     ok2 = send_contact(yuri_phone, lead_name, lead_phone, lead_email, organization)
-    return ok1 and ok2
+    ok3 = send_text_message(yuri_phone, separator)
+    return ok1 and ok2 and ok3
 
 
 def notify_lead(to_phone: str, employee_name: str, employee_phone: str, employee_email: str) -> bool:
