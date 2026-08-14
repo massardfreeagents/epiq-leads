@@ -96,6 +96,8 @@
     <div class="interest-tag" data-value="MSA">MSA</div>
     <div class="interest-tag" data-value="Pediu apresentação">Pediu apresentação</div>
     <div class="interest-tag" data-value="Curso">Curso</div>
+    <div class="interest-tag" data-value="FTO/Org. Criminosa">FTO/Org. Criminosa</div>
+    <div class="interest-tag" data-value="Monit. Comunicações">Monit. Comunicações</div>
   </div>
 
   <div class="field">
@@ -273,57 +275,66 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 });
 
 // envio do lead
+let isSubmitting = false;
 document.getElementById('submitBtn').addEventListener('click', async () => {
-  const employeeId = document.getElementById('employeeSelect').value;
-  if (!employeeId) return alert('Selecione o funcionário.');
-  if (!document.getElementById('first_name').value) return alert('Preencha ao menos o nome.');
-  if (!selectedClass) return alert('Selecione a classificação (A, B, C ou D).');
-
-  // separa os e-mails por vírgula, remove espaços e valida cada um
-  const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-  const emails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
-  for (const e of emails) {
-    if (!emailRegex.test(e)) {
-      return alert(`O e-mail "${e}" não parece válido. Confira e corrija antes de salvar.`);
-    }
-  }
-
+  if (isSubmitting) return; // trava contra duplo clique/toque
+  isSubmitting = true;
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
-  document.getElementById('status').innerText = 'Salvando e enviando...';
 
-  const payload = {
-    employee_id: parseInt(employeeId),
-    first_name: document.getElementById('first_name').value,
-    last_name: document.getElementById('last_name').value,
-    company: document.getElementById('company').value,
-    position: document.getElementById('position').value,
-    phone: document.getElementById('phone').value,
-    emails: emails,
-    interests: Array.from(selectedInterests),
-    notes: document.getElementById('notes').value,
-    classification: selectedClass,
-  };
+  try {
+    const employeeId = document.getElementById('employeeSelect').value;
+    if (!employeeId) { alert('Selecione o funcionário.'); return; }
+    if (!document.getElementById('first_name').value) { alert('Preencha ao menos o nome.'); return; }
+    if (!selectedClass) { alert('Selecione a classificação (A, B, C ou D).'); return; }
 
-  const res = await fetch(`${API}/api/leads`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+    // separa os e-mails por vírgula, remove espaços e valida cada um
+    const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+    const emails = document.getElementById('email').value.split(',').map(e => e.trim()).filter(e => e);
+    for (const e of emails) {
+      if (!emailRegex.test(e)) {
+        alert(`O e-mail "${e}" não parece válido. Confira e corrija antes de salvar.`);
+        return;
+      }
+    }
 
-  if (res.ok) {
-    const msg = emails.length > 1 ? `✅ ${emails.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
-    showToast(msg);
-    document.getElementById('status').innerText = '';
-    ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
-    document.getElementById('phone').value = '+55 ';
-    document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
-    selectedInterests.clear(); selectedClass = null;
-    setTimeout(scrollToTop, 1800);
-  } else {
-    document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
+    document.getElementById('status').innerText = 'Salvando e enviando...';
+
+    const payload = {
+      employee_id: parseInt(employeeId),
+      first_name: document.getElementById('first_name').value,
+      last_name: document.getElementById('last_name').value,
+      company: document.getElementById('company').value,
+      position: document.getElementById('position').value,
+      phone: document.getElementById('phone').value,
+      emails: emails,
+      interests: Array.from(selectedInterests),
+      notes: document.getElementById('notes').value,
+      classification: selectedClass,
+    };
+
+    const res = await fetch(`${API}/api/leads`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      const msg = emails.length > 1 ? `✅ ${emails.length} leads salvos com sucesso!` : '✅ Lead salvo com sucesso!';
+      showToast(msg);
+      document.getElementById('status').innerText = '';
+      ['first_name','last_name','company','position','phone','email','notes'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('phone').value = '+55 ';
+      document.querySelectorAll('.interest-tag.active').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.class-circle.active').forEach(t => t.classList.remove('active'));
+      selectedInterests.clear(); selectedClass = null;
+      setTimeout(scrollToTop, 1800);
+    } else {
+      document.getElementById('status').innerText = '❌ Erro ao salvar. Tente novamente.';
+    }
+  } finally {
+    isSubmitting = false;
+    btn.disabled = false;
   }
-  btn.disabled = false;
 });
 </script>
 </body>
