@@ -89,3 +89,14 @@ def send_report_email(to_emails: list, xlsx_bytes: bytes, sender_email: str, fil
 
         headers = {
             "api-key": BREVO_API_KEY,
+            "Content-Type": "application/json",
+            "accept": "application/json",
+        }
+
+        resp = requests.post(BREVO_URL, json=payload, headers=headers, timeout=30)
+        if resp.status_code not in (200, 201):
+            print(f"[BREVO REPORT ERROR] status={resp.status_code} body={resp.text}")
+        return resp.status_code in (200, 201)
+    except Exception as e:
+        print(f"[BREVO EXCEPTION] send_report_email falhou: {e}")
+        return False
