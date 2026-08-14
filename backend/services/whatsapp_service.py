@@ -37,18 +37,18 @@ def send_folder_document(to_phone: str) -> bool:
     return resp.status_code in (200, 201)
 
 
-def send_employee_contact(to_phone: str, employee_name: str, employee_phone: str, employee_email: str) -> bool:
+def send_contact(to_phone: str, full_name: str, contact_phone: str, contact_email: str, organization: str = "") -> bool:
     number = _normalize_number(to_phone)
     url = f"{EVOLUTION_BASE_URL}/message/sendContact/{EVOLUTION_INSTANCE}"
     payload = {
         "number": number,
         "contact": [
             {
-                "fullName": f"{employee_name} - Epiq",
-                "wuid": _normalize_number(employee_phone),
-                "phoneNumber": employee_phone,
-                "email": employee_email,
-                "organization": "Epiq",
+                "fullName": full_name,
+                "wuid": _normalize_number(contact_phone) if contact_phone else number,
+                "phoneNumber": contact_phone,
+                "email": contact_email,
+                "organization": organization,
             }
         ],
     }
@@ -56,6 +56,29 @@ def send_employee_contact(to_phone: str, employee_name: str, employee_phone: str
     if resp.status_code not in (200, 201):
         print(f"[EVOLUTION sendContact ERROR] status={resp.status_code} body={resp.text} url={url}")
     return resp.status_code in (200, 201)
+
+
+def send_employee_contact(to_phone: str, employee_name: str, employee_phone: str, employee_email: str) -> bool:
+    return send_contact(to_phone, f"{employee_name} - Epiq", employee_phone, employee_email, "Epiq")
+
+
+def send_text_message(to_phone: str, text: str) -> bool:
+    number = _normalize_number(to_phone)
+    url = f"{EVOLUTION_BASE_URL}/message/sendText/{EVOLUTION_INSTANCE}"
+    payload = {"number": number, "text": text}
+    resp = requests.post(url, json=payload, headers=HEADERS, timeout=30)
+    if resp.status_code not in (200, 201):
+        print(f"[EVOLUTION sendText ERROR] status={resp.status_code} body={resp.text} url={url}")
+    return resp.status_code in (200, 201)
+
+
+def notify_hot_lead(yuri_phone: str, summary_text: str, lead_name: str, lead_company: str,
+                     lead_position: str, lead_phone: str, lead_email: str) -> bool:
+    """Envia resumo em texto + cartão de contato do lead para o Yuri, quando classificado A ou B."""
+    ok1 = send_text_message(yuri_phone, summary_text)
+    organization = f"{lead_company} - {lead_position}" if lead_position else lead_company
+    ok2 = send_contact(yuri_phone, lead_name, lead_phone, lead_email, organization)
+    return ok1 and ok2
 
 
 def notify_lead(to_phone: str, employee_name: str, employee_phone: str, employee_email: str) -> bool:
