@@ -217,11 +217,15 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
     lead_phone = lead.phone
 
     def _send():
-        # e-mail: um envio por endereço informado
+        # ---- Canal 1: E-MAIL (independente dos outros dois) ----
         for lid, email in zip(lead_ids, emails):
             if not email:
                 continue
-            ok = send_folder_email(email, full_name, employee_name, employee_email, employee_phone)
+            try:
+                ok = send_folder_email(email, full_name, employee_name, employee_email, employee_phone)
+            except Exception as e:
+                print(f"[LEAD SEND EXCEPTION] e-mail falhou para lead {lid}: {e}")
+                ok = False
             local_db = SessionLocal()
             try:
                 db_lead_local = local_db.query(models.Lead).get(lid)
@@ -230,10 +234,15 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
             finally:
                 local_db.close()
 
-        # WhatsApp: enviado UMA ÚNICA VEZ, independente de quantos e-mails foram informados
+        # ---- Canal 2: WHATSAPP (independente do e-mail e do alerta) ----
+        # Enviado UMA ÚNICA VEZ, independente de quantos e-mails foram informados
         wpp_ok = True
         if lead_phone:
-            wpp_ok = notify_lead(lead_phone, employee_name, employee_phone, employee_email)
+            try:
+                wpp_ok = notify_lead(lead_phone, employee_name, employee_phone, employee_email)
+            except Exception as e:
+                print(f"[LEAD SEND EXCEPTION] WhatsApp falhou: {e}")
+                wpp_ok = False
 
         local_db = SessionLocal()
         try:
@@ -244,74 +253,13 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
         finally:
             local_db.close()
 
-        # Alerta pro Yuri: leads quentes (A ou B) geram resumo + cartão de contato
+        # ---- Canal 3: ALERTA PRO YURI (independente do e-mail e do WhatsApp do lead) ----
         if lead.classification in ("A", "B"):
-            interests_text = ", ".join(lead.interests) if lead.interests else "-"
-            notes_text = lead.notes if lead.notes else "-"
-            summary = (
-                f"Empresa: {lead.company or '-'} | "
-                f"Interesse em: {interests_text} | "
-                f"Observação: {notes_text} | "
-                f"Lead classificado como: {lead.classification} | "
-                f"Lead levantado por: {employee_name}"
-            )
-            notify_hot_lead(
-                YURI_PHONE, summary, full_name,
-                lead.company, lead.position, lead_phone,
-                emails[0] if emails and emails[0] else "",
-            )
-
-    background_tasks.add_task(_send)
-
-    return {"ids": lead_ids, "status": "created"}
-
-
-@app.get("/api/leads")
-def list_leads(db: Session = Depends(get_db)):
-    leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
-    result = []
-    for l in leads:
-        result.append({
-            "id": l.id,
-            "employee": l.employee.name if l.employee else None,
-            "first_name": l.first_name,
-            "last_name": l.last_name,
-            "company": l.company,
-            "position": l.position,
-            "phone": l.phone,
-            "email": l.email,
-            "interests": l.interests,
-            "notes": l.notes,
-            "classification": l.classification,
-            "email_sent": l.email_sent,
-            "whatsapp_sent": l.whatsapp_sent,
-            "created_at": l.created_at.isoformat(),
-        })
-    return result
-
-
-@app.get("/api/leads/export")
-def export_leads_xlsx(x_export_token: str = Header(None), db: Session = Depends(get_db)):
-    if not EXPORT_TOKEN or (x_export_token or "").strip() != EXPORT_TOKEN:
-        raise HTTPException(403, "Acesso negado")
-
-    leads = db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
-    xlsx_bytes = build_leads_xlsx(leads)
-
-    return StreamingResponse(
-        iter([xlsx_bytes]),
-        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=leads_epiq.xlsx"},
-    )
-
-
-@app.get("/api/leads/report-now")
-def trigger_report_now(x_export_token: str = Header(None)):
-    if not EXPORT_TOKEN or (x_export_token or "").strip() != EXPORT_TOKEN:
-        raise HTTPException(403, "Acesso negado")
-    send_daily_report()
-    return {"status": "relatório disparado, confira o e-mail em alguns instantes"}
-
-
-# ---------- Servir o frontend ----------
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+            try:
+                interests_text = ", ".join(lead.interests) if lead.interests else "-"
+                notes_text = lead.notes if lead.notes else "-"
+                summary = (
+                    f"Empresa: {lead.company or '-'} | "
+                    f"Interesse em: {interests_text} | "
+                    f"Observação: {notes_text} | "
+                    f"Lead classificado como: {lead.classification} | "
