@@ -18,8 +18,10 @@ import time
 from services.ocr import extract_badge_data
 from services.transcribe import transcribe_audio
 from services.email_service import send_folder_email, send_report_email
-from services.whatsapp_service import notify_lead
+from services.whatsapp_service import notify_lead, notify_hot_lead
 from services.report import build_leads_xlsx
+
+YURI_PHONE = "5521993119964"  # telefone do Yuri Medeiros, para alertas de leads A/B
 
 # guarda impressões digitais de envios recentes pra evitar duplicidade
 # (proteção extra contra duplo clique/toque, além da trava do frontend)
@@ -241,6 +243,22 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
             local_db.commit()
         finally:
             local_db.close()
+
+        # Alerta pro Yuri: leads quentes (A ou B) geram resumo + cartão de contato
+        if lead.classification in ("A", "B"):
+            interests_text = ", ".join(lead.interests) if lead.interests else "-"
+            notes_text = lead.notes if lead.notes else "-"
+            summary = (
+                f"Empresa: {lead.company or '-'} | "
+                f"Interesse em: {interests_text} | "
+                f"Observação: {notes_text} | "
+                f"Lead classificado como: {lead.classification}"
+            )
+            notify_hot_lead(
+                YURI_PHONE, summary, full_name,
+                lead.company, lead.position, lead_phone,
+                emails[0] if emails and emails[0] else "",
+            )
 
     background_tasks.add_task(_send)
 
