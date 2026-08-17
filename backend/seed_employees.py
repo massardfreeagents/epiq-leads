@@ -17,6 +17,7 @@ EMPLOYEES = [
     {"name": "Andre Moreira", "email": "andre.moreira@epiqglobal.com", "phone": "5511963988841"},
     {"name": "Rafael Nakashima", "email": "rafael.nakashima@epiqglobal.com", "phone": "5511993933794"},
     {"name": "Thiago Casagrande", "email": "thiago.casagrande@epiqglobal.com", "phone": "5511987600685"},
+    {"name": "Adriana Castanon", "email": "adriana.castanon@epiqglobal.com", "phone": "5521999353131"},
 ]
 
 db = SessionLocal()
