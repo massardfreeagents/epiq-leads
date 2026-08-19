@@ -22,6 +22,7 @@ from services.whatsapp_service import notify_lead, notify_hot_lead
 from services.report import build_leads_xlsx
 
 YURI_PHONE = "5521993119964"  # telefone do Yuri Medeiros, para alertas de leads A/B
+WHATSAPP_ENABLED = os.environ.get("WHATSAPP_ENABLED", "true").strip().lower() != "false"
 
 # guarda impressões digitais de envios recentes pra evitar duplicidade
 # (proteção extra contra duplo clique/toque, além da trava do frontend)
@@ -237,24 +238,29 @@ def create_lead(lead: schemas.LeadCreate, background_tasks: BackgroundTasks, db:
         # ---- Canal 2: WHATSAPP (independente do e-mail e do alerta) ----
         # Enviado UMA ÚNICA VEZ, independente de quantos e-mails foram informados
         wpp_ok = True
-        if lead_phone:
+        if not WHATSAPP_ENABLED:
+            wpp_status = "disabled"
+        elif lead_phone:
             try:
                 wpp_ok = notify_lead(lead_phone, employee_name, employee_phone, employee_email)
             except Exception as e:
                 print(f"[LEAD SEND EXCEPTION] WhatsApp falhou: {e}")
                 wpp_ok = False
+            wpp_status = "sent" if wpp_ok else "failed"
+        else:
+            wpp_status = "sent"  # não tinha telefone, não é uma falha
 
         local_db = SessionLocal()
         try:
             for lid in lead_ids:
                 db_lead_local = local_db.query(models.Lead).get(lid)
-                db_lead_local.whatsapp_sent = "sent" if wpp_ok else "failed"
+                db_lead_local.whatsapp_sent = wpp_status
             local_db.commit()
         finally:
             local_db.close()
 
         # ---- Canal 3: ALERTA PRO YURI (independente do e-mail e do WhatsApp do lead) ----
-        if lead.classification in ("A", "B"):
+        if WHATSAPP_ENABLED and lead.classification in ("A", "B"):
             try:
                 interests_text = ", ".join(lead.interests) if lead.interests else "-"
                 notes_text = lead.notes if lead.notes else "-"
